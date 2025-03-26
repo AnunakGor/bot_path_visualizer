@@ -5,10 +5,6 @@ pattern_started = re.compile(
     r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*#path_calculation_started\s+SRC = \{\{(?P<src_x>\d+),(?P<src_y>\d+)\},(?P<src_dir>\w+),\w+\},\s+DEST = \{\{(?P<dest_x>\d+),(?P<dest_y>\d+)\},\w+\}'
 )
 
-pattern_added_node = re.compile(
-    r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*#added_node,?\s+Coor = \{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s+FromCoor = \{(?P<from_x>\d+),(?P<from_y>\d+)\}.*GCost = (?P<GCost>\d+),\s+HCost = (?P<HCost>\d+),\s+FScore = (?P<FScore>\d+)'
-)
-
 pattern_chosen_node = re.compile(
     r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*#chosen_node\s+\{\{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s*\{(?P<from_x>\d+),(?P<from_y>\d+)\}.*GCost = (?P<GCost>\d+),\s+HCost = (?P<HCost>\d+),\s+FScore = (?P<FScore>\d+)'
 )
@@ -37,6 +33,22 @@ pattern_conflict_check_rejected = re.compile(
     r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*(?:#conflict_check|#ButlerId_\d+):\s+Node = \{\{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s*(?P<bot_dir>\w+),(?P<rack_dir>\w+)\}\s+not included, reason\s+=\s+(?P<reason>.+)$'
 )
 
+pattern_pause_node = re.compile(
+    r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*#pause_node\s+=\s+\{\{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s*(?P<bot_dir>\w+),\s*(?P<rack_dir>\w+)\},\s*PauseTime\s*=\s*(?P<pause_time>\d+).*'
+)
+
+pattern_added_node = re.compile(
+    r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*"#added_node"\s*,\s*Coor\s*=\s*\{(?P<coord_x>\d+),(?P<coord_y>\d+)\}\s*,\s*FromCoor\s*=\s*\{(?P<from_x>\d+),(?P<from_y>\d+)\}\s*,\s*TurnTag\s*=\s*\{(?P<turn_tag>[^}]+)\}\s*,\s*MovingStatus\s*=\s*(?P<moving_status>\w+)\s*,\s*BDir\s*=\s*(?P<bot_dir>\w+)\s*,\s*PhyBDir\s*=\s*(?P<phys_dir>\w+)\s*,\s*RDir\s*=\s*(?P<rack_dir>\w+)\s*,\s*GCost\s*=\s*(?P<GCost>\d+)\s*,\s*HCost\s*=\s*(?P<HCost>\d+)\s*,\s*FScore\s*=\s*(?P<FScore>\d+)\s*,\s*PauseTime\s*=\s*(?P<pause_time>\d+)'
+)
+
+pattern_cannot_revisit_node = re.compile(
+    r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*#cannot_revisit_node\s+\{\{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s*\{(?P<next_x>\d+),(?P<next_y>\d+)\},\s*(?P<movement_status>\w+),\s*(?P<butler_status>\w+),\s*(?P<bot_dir>\w+),\s*(?P<rack_dir>\w+)\}'
+)
+
+pattern_visited_node_count = re.compile(
+    r'^\s*visited_node_count=(?P<count>\d+)'
+)
+
 parsed_events = []
 
 def parse_lines(lines):
@@ -58,22 +70,6 @@ def parse_lines(lines):
                 "dest": {
                     "coordinate": {"x": int(m.group("dest_x")), "y": int(m.group("dest_y"))}
                 }
-            }
-            parsed_events.append(parsed)
-            i += 1
-            continue
-
-        m = pattern_added_node.match(line)
-        if m:
-            parsed = {
-                "event": "added_node",
-                "timestamp": m.group("timestamp"),
-                "bot_id": m.group("bot_id"),
-                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
-                "from_coordinate": {"x": int(m.group("from_x")), "y": int(m.group("from_y"))},
-                "GCost": int(m.group("GCost")),
-                "HCost": int(m.group("HCost")),
-                "FScore": int(m.group("FScore"))
             }
             parsed_events.append(parsed)
             i += 1
@@ -190,6 +186,71 @@ def parse_lines(lines):
             }
             parsed_events.append(parsed)
             i += 1
+            continue
+
+        m = pattern_pause_node.match(line)
+        if m:
+            parsed = {
+                "event": "pause_node",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
+                "bot_direction": m.group("bot_dir"),
+                "rack_direction": m.group("rack_dir"),
+                "pause_time": int(m.group("pause_time"))
+            }
+            parsed_events.append(parsed)
+            i += 1
+            continue
+
+        m = pattern_added_node.match(line)
+        if m:
+            parsed = {
+                "event": "added_node",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
+                "from_coordinate": {"x": int(m.group("from_x")), "y": int(m.group("from_y"))},
+                "turn_tag": m.group("turn_tag"),
+                "moving_status": m.group("moving_status"),
+                "bot_direction": m.group("bot_dir"),
+                "physical_direction": m.group("phys_dir"),
+                "rack_direction": m.group("rack_dir"),
+                "GCost": int(m.group("GCost")),
+                "HCost": int(m.group("HCost")),
+                "FScore": int(m.group("FScore")),
+                "pause_time": int(m.group("pause_time"))
+            }
+            parsed_events.append(parsed)
+            i += 1
+            continue
+
+        m = pattern_cannot_revisit_node.match(line)
+        if m:
+            revisit_node = {
+                "event": "cannot_revisit_node",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
+                "next_coordinate": {"x": int(m.group("next_x")), "y": int(m.group("next_y"))},
+                "movement_status": m.group("movement_status"),
+                "butler_status": m.group("butler_status"),
+                "bot_direction": m.group("bot_dir"),
+                "rack_direction": m.group("rack_dir")
+            }
+            
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                m_count = pattern_visited_node_count.match(next_line)
+                if m_count:
+                    revisit_node["visited_node_count"] = int(m_count.group("count"))
+                    i += 2
+                else:
+                    i += 1
+            else:
+                i += 1
+                
+            parsed_events.append(revisit_node)
             continue
 
         i += 1
