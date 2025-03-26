@@ -22,7 +22,7 @@ pattern_exploring_node = re.compile(
 )
 
 pattern_exploring_node_rejected = re.compile(
-    r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*Node = \{\{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s*(?P<bot_dir>\w+),(?P<rack_dir>\w+)\}\s+not included, reason\s+=\s+(?P<reason>.+)$'
+    r'^.*Node = \{\{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s*(?P<bot_dir>\w+),(?P<rack_dir>\w+)\}\s+not included, reason\s+=\s+(?P<reason>.+)$'
 )
 
 pattern_processing_node = re.compile(
@@ -34,132 +34,171 @@ pattern_conflict_check = re.compile(
 )
 
 pattern_conflict_check_rejected = re.compile(
-    r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*#conflict_check.*Node = \{\{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s*(?P<bot_dir>\w+),(?P<rack_dir>\w+)\}\s+not included, reason\s+=\s+(?P<reason>.+)$'
+    r'^(?P<timestamp>\S+ \S+).*butler_id=(?P<bot_id>\d+).*(?:#conflict_check|#ButlerId_\d+):\s+Node = \{\{(?P<coord_x>\d+),(?P<coord_y>\d+)\},\s*(?P<bot_dir>\w+),(?P<rack_dir>\w+)\}\s+not included, reason\s+=\s+(?P<reason>.+)$'
 )
 
 parsed_events = []
 
-def parse_line(line):
-    match = pattern_started.match(line)
-    if match:
-        return {
-            "event": "path_calculation_started",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "src": {
-                "coordinate": {"x": int(match.group("src_x")), "y": int(match.group("src_y"))},
-                "bot_direction": match.group("src_dir")
-            },
-            "dest": {
-                "coordinate": {"x": int(match.group("dest_x")), "y": int(match.group("dest_y"))}
+def parse_lines(lines):
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        parsed = None
+
+        m = pattern_started.match(line)
+        if m:
+            parsed = {
+                "event": "path_calculation_started",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "src": {
+                    "coordinate": {"x": int(m.group("src_x")), "y": int(m.group("src_y"))},
+                    "bot_direction": m.group("src_dir")
+                },
+                "dest": {
+                    "coordinate": {"x": int(m.group("dest_x")), "y": int(m.group("dest_y"))}
+                }
             }
-        }
-    
-    match = pattern_added_node.match(line)
-    if match:
-        return {
-            "event": "added_node",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "coordinate": {"x": int(match.group("coord_x")), "y": int(match.group("coord_y"))},
-            "from_coordinate": {"x": int(match.group("from_x")), "y": int(match.group("from_y"))},
-            "GCost": int(match.group("GCost")),
-            "HCost": int(match.group("HCost")),
-            "FScore": int(match.group("FScore"))
-        }
-    
-    match = pattern_chosen_node.match(line)
-    if match:
-        return {
-            "event": "chosen_node",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "coordinate": {"x": int(match.group("coord_x")), "y": int(match.group("coord_y"))},
-            "from_coordinate": {"x": int(match.group("from_x")), "y": int(match.group("from_y"))},
-            "GCost": int(match.group("GCost")),
-            "HCost": int(match.group("HCost")),
-            "FScore": int(match.group("FScore"))
-        }
-    
-    match = pattern_neighbour_nodes.match(line)
-    if match:
-        return {
-            "event": "neighbour_nodes",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "neighbors_raw": match.group("neighbors").strip()
-        }
-    
-    match = pattern_exploring_node.match(line)
-    if match:
-        return {
-            "event": "exploring_node",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "coordinate": {"x": int(match.group("coord_x")), "y": int(match.group("coord_y"))},
-            "bot_direction": match.group("bot_dir"),
-            "physical_direction": match.group("phys_dir"),
-            "rack_direction": match.group("rack_dir"),
-            "status": "accepted"
-        }
-    
-    match = pattern_exploring_node_rejected.match(line)
-    if match:
-        return {
-            "event": "exploring_node",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "coordinate": {"x": int(match.group("coord_x")), "y": int(match.group("coord_y"))},
-            "bot_direction": match.group("bot_dir"),
-            "rack_direction": match.group("rack_dir"),
-            "status": "rejected",
-            "reason": match.group("reason").strip()
-        }
-    
-    match = pattern_processing_node.match(line)
-    if match:
-        return {
-            "event": "processing_node",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "coordinate": {"x": int(match.group("coord_x")), "y": int(match.group("coord_y"))},
-            "from_coordinate": {"x": int(match.group("from_x")), "y": int(match.group("from_y"))}
-        }
-    
-    match = pattern_conflict_check.match(line)
-    if match:
-        span_coords_raw = match.group("span_coords")
-        span_coords = [sc.strip() for sc in span_coords_raw.split('},') if sc]
-        return {
-            "event": "conflict_check",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "anchor_coordinate": {"x": int(match.group("anchor_x")), "y": int(match.group("anchor_y"))},
-            "span_coords": span_coords,
-            "status": "accepted"
-        }
-    
-    match = pattern_conflict_check_rejected.match(line)
-    if match:
-        return {
-            "event": "conflict_check",
-            "timestamp": match.group("timestamp"),
-            "bot_id": match.group("bot_id"),
-            "coordinate": {"x": int(match.group("coord_x")), "y": int(match.group("coord_y"))},
-            "bot_direction": match.group("bot_dir"),
-            "rack_direction": match.group("rack_dir"),
-            "status": "rejected",
-            "reason": match.group("reason").strip()
-        }
-    
-    return None
+            parsed_events.append(parsed)
+            i += 1
+            continue
+
+        m = pattern_added_node.match(line)
+        if m:
+            parsed = {
+                "event": "added_node",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
+                "from_coordinate": {"x": int(m.group("from_x")), "y": int(m.group("from_y"))},
+                "GCost": int(m.group("GCost")),
+                "HCost": int(m.group("HCost")),
+                "FScore": int(m.group("FScore"))
+            }
+            parsed_events.append(parsed)
+            i += 1
+            continue
+
+        m = pattern_chosen_node.match(line)
+        if m:
+            parsed = {
+                "event": "chosen_node",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
+                "from_coordinate": {"x": int(m.group("from_x")), "y": int(m.group("from_y"))},
+                "GCost": int(m.group("GCost")),
+                "HCost": int(m.group("HCost")),
+                "FScore": int(m.group("FScore"))
+            }
+            parsed_events.append(parsed)
+            i += 1
+            continue
+
+        m = pattern_neighbour_nodes.match(line)
+        if m:
+            parsed = {
+                "event": "neighbour_nodes",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "neighbors_raw": m.group("neighbors").strip()
+            }
+            parsed_events.append(parsed)
+            i += 1
+            continue
+
+        m = pattern_exploring_node.match(line)
+        if m:
+            exploring = {
+                "event": "exploring_node",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
+                "bot_direction": m.group("bot_dir"),
+                "physical_direction": m.group("phys_dir"),
+                "rack_direction": m.group("rack_dir"),
+                "status": "accepted"
+            }
+            reasons = []
+            look_ahead = 1
+            while i + look_ahead < len(lines):
+                next_line = lines[i + look_ahead].strip()
+                m_reject = pattern_exploring_node_rejected.match(next_line)
+                if m_reject:
+                    reasons.append(m_reject.group("reason").strip())
+                    look_ahead += 1
+                else:
+                    break
+            if reasons:
+                exploring["status"] = "rejected"
+                exploring["rejection_reasons"] = reasons
+            parsed_events.append(exploring)
+            i += look_ahead
+            continue
+
+        m = pattern_processing_node.match(line)
+        if m:
+            parsed = {
+                "event": "processing_node",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
+                "from_coordinate": {"x": int(m.group("from_x")), "y": int(m.group("from_y"))}
+            }
+            parsed_events.append(parsed)
+            i += 1
+            continue
+
+        m = pattern_conflict_check.match(line)
+        if m:
+            span_coords_raw = m.group("span_coords")
+            spans = [sc.strip() + "}" if not sc.strip().endswith("}") else sc.strip() for sc in span_coords_raw.split("},") if sc.strip()]
+            conflict = {
+                "event": "conflict_check",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "anchor_coordinate": {"x": int(m.group("anchor_x")), "y": int(m.group("anchor_y"))},
+                "span_coords": spans,
+                "conflict_found": None
+            }
+            look_ahead = 1
+            rejection_reasons = []
+            while i + look_ahead < len(lines):
+                next_line = lines[i + look_ahead].strip()
+                m_reject = pattern_conflict_check_rejected.match(next_line)
+                if m_reject:
+                    rejection_reasons.append(m_reject.group("reason").strip())
+                    look_ahead += 1
+                else:
+                    break
+            if rejection_reasons:
+                conflict["conflict_found"] = " ".join(rejection_reasons)
+            parsed_events.append(conflict)
+            i += look_ahead
+            continue
+
+        m = pattern_conflict_check_rejected.match(line)
+        if m:
+            parsed = {
+                "event": "conflict_check",
+                "timestamp": m.group("timestamp"),
+                "bot_id": m.group("bot_id"),
+                "coordinate": {"x": int(m.group("coord_x")), "y": int(m.group("coord_y"))},
+                "bot_direction": m.group("bot_dir"),
+                "rack_direction": m.group("rack_dir"),
+                "conflict_found": m.group("reason").strip()
+            }
+            parsed_events.append(parsed)
+            i += 1
+            continue
+
+        i += 1
 
 log_file_path = 'path_calc_bot_11468.log'
 with open(log_file_path, 'r') as f:
-    for line in f:
-        parsed = parse_line(line)
-        if parsed:
-            parsed_events.append(parsed)
+    lines = f.readlines()
+
+parse_lines(lines)
 
 with open('parsed_log.json', 'w') as outfile:
     json.dump(parsed_events, outfile, indent=2)
