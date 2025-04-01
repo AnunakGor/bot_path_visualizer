@@ -53,6 +53,7 @@ parsed_events = []
 
 def parse_lines(lines):
     i = 0
+    event_counter = 1
     while i < len(lines):
         line = lines[i].strip()
         parsed = None
@@ -60,6 +61,7 @@ def parse_lines(lines):
         m = pattern_started.match(line)
         if m:
             parsed = {
+                "event_id": event_counter,
                 "event": "path_calculation_started",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -72,12 +74,14 @@ def parse_lines(lines):
                 }
             }
             parsed_events.append(parsed)
+            event_counter += 1
             i += 1
             continue
 
         m = pattern_chosen_node.match(line)
         if m:
             parsed = {
+                "event_id": event_counter,
                 "event": "chosen_node",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -88,24 +92,28 @@ def parse_lines(lines):
                 "FScore": int(m.group("FScore"))
             }
             parsed_events.append(parsed)
+            event_counter += 1
             i += 1
             continue
 
         m = pattern_neighbour_nodes.match(line)
         if m:
             parsed = {
+                "event_id": event_counter,
                 "event": "neighbour_nodes",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
                 "neighbors_raw": m.group("neighbors").strip()
             }
             parsed_events.append(parsed)
+            event_counter += 1
             i += 1
             continue
 
         m = pattern_exploring_node.match(line)
         if m:
             exploring = {
+                "event_id": event_counter,
                 "event": "exploring_node",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -115,8 +123,8 @@ def parse_lines(lines):
                 "rack_direction": m.group("rack_dir"),
                 "status": "accepted"
             }
-            reasons = []
             look_ahead = 1
+            reasons = []
             while i + look_ahead < len(lines):
                 next_line = lines[i + look_ahead].strip()
                 m_reject = pattern_exploring_node_rejected.match(next_line)
@@ -129,12 +137,14 @@ def parse_lines(lines):
                 exploring["status"] = "rejected"
                 exploring["rejection_reasons"] = reasons
             parsed_events.append(exploring)
+            event_counter += 1
             i += look_ahead
             continue
 
         m = pattern_processing_node.match(line)
         if m:
             parsed = {
+                "event_id": event_counter,
                 "event": "processing_node",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -142,6 +152,7 @@ def parse_lines(lines):
                 "from_coordinate": {"x": int(m.group("from_x")), "y": int(m.group("from_y"))}
             }
             parsed_events.append(parsed)
+            event_counter += 1
             i += 1
             continue
 
@@ -150,6 +161,7 @@ def parse_lines(lines):
             span_coords_raw = m.group("span_coords")
             spans = [sc.strip() + "}" if not sc.strip().endswith("}") else sc.strip() for sc in span_coords_raw.split("},") if sc.strip()]
             conflict = {
+                "event_id": event_counter,
                 "event": "conflict_check",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -170,12 +182,14 @@ def parse_lines(lines):
             if rejection_reasons:
                 conflict["conflict_found"] = " ".join(rejection_reasons)
             parsed_events.append(conflict)
+            event_counter += 1
             i += look_ahead
             continue
 
         m = pattern_conflict_check_rejected.match(line)
         if m:
             parsed = {
+                "event_id": event_counter,
                 "event": "conflict_check",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -185,12 +199,14 @@ def parse_lines(lines):
                 "conflict_found": m.group("reason").strip()
             }
             parsed_events.append(parsed)
+            event_counter += 1
             i += 1
             continue
 
         m = pattern_pause_node.match(line)
         if m:
             parsed = {
+                "event_id": event_counter,
                 "event": "pause_node",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -200,12 +216,14 @@ def parse_lines(lines):
                 "pause_time": int(m.group("pause_time"))
             }
             parsed_events.append(parsed)
+            event_counter += 1
             i += 1
             continue
 
         m = pattern_added_node.match(line)
         if m:
             parsed = {
+                "event_id": event_counter,
                 "event": "added_node",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -222,12 +240,14 @@ def parse_lines(lines):
                 "pause_time": int(m.group("pause_time"))
             }
             parsed_events.append(parsed)
+            event_counter += 1
             i += 1
             continue
 
         m = pattern_cannot_revisit_node.match(line)
         if m:
             revisit_node = {
+                "event_id": event_counter,
                 "event": "cannot_revisit_node",
                 "timestamp": m.group("timestamp"),
                 "bot_id": m.group("bot_id"),
@@ -251,6 +271,7 @@ def parse_lines(lines):
                 i += 1
                 
             parsed_events.append(revisit_node)
+            event_counter += 1
             continue
 
         i += 1
