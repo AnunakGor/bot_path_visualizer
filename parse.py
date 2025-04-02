@@ -429,7 +429,7 @@ class PathLogParser:
             x, y = int(coord_match.group(1)), int(coord_match.group(2))
             from_x, from_y = int(coord_match.group(3)), int(coord_match.group(4))
             
-            turn_match = re.search(r'TurnTag = ([^,]+)', line) or re.search(r'turn_tag[=:]\s*([^,]+)', line, re.IGNORECASE)
+            turn_match = re.search(r'TurnTag = (\{[^}]+\}|[^,]+),', line)
             turn_tag = turn_match.group(1) if turn_match else None
             
             status_match = re.search(r'MovingStatus = ([^,]+)', line) or re.search(r'moving_status[=:]\s*([^,]+)', line, re.IGNORECASE)
