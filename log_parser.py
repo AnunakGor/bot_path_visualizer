@@ -83,6 +83,11 @@ class PathLogParser:
                 # handling parsing of added node using different formats
                 elif "\"#added_node\"" in line or "#added_node" in line:
                     self._parse_added_node(line)
+
+                # Parse path calculation ended
+                elif "#path_calculation_ended" in line or "path calculation ended" in line.lower():
+
+                    self._parse_path_calculation_ended(line)
                 
                 i += 1
             
@@ -471,6 +476,39 @@ class PathLogParser:
             
             self.events.append(event)
             self.event_id += 1
+            
+    def _parse_path_calculation_ended(self, line):
+        """Parse the path calculation ended event."""
+        timestamp = self._extract_timestamp(line)
+        bot_id = self._extract_bot_id(line)
+        
+        # Try to extract success/failure status if available
+        status = "completed"
+        if "failed" in line.lower() or "failure" in line.lower():
+            status = "failed"
+        elif "success" in line.lower():
+            status = "success"
+        
+        # Try to extract path length if available
+        path_length = None
+        path_length_match = re.search(r'path length[\s=:]+(\d+\.?\d*)', line, re.IGNORECASE)
+        if path_length_match:
+            try:
+                path_length = float(path_length_match.group(1))
+            except ValueError:
+                pass
+        
+        event = {
+            "event_id": self.event_id,
+            "event": "path_calculation_ended",
+            "timestamp": timestamp,
+            "bot_id": bot_id,
+            "status": status,
+            "path_length": path_length
+        }
+        
+        self.events.append(event)
+        self.event_id += 1
     
     def _parse_added_node(self, line):
         """Parse the added node event."""
