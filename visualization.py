@@ -17,42 +17,52 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
     
     src_coord = None
     dest_coord = None
-    
+    all_coords = [] # To determine relevant area on the plot/grid                                                                               
+
     for event in current_events:
         event_type = event.get('event')
         
         if event_type == 'path_calculation_started':
             if 'src' in event and 'coordinate' in event['src']:
                 src_coord = (event['src']['coordinate'].get('x'), event['src']['coordinate'].get('y'))
+                if src_coord[0] is not None and src_coord[1] is not None:
+                    all_coords.append(src_coord)
             if 'dest' in event and 'coordinate' in event['dest']:
                 dest_coord = (event['dest']['coordinate'].get('x'), event['dest']['coordinate'].get('y'))
+                if dest_coord[0] is not None and dest_coord[1] is not None:
+                    all_coords.append(dest_coord)
                 
         elif event_type == 'chosen_node' and 'coordinate' in event:
             x, y = event['coordinate'].get('x'), event['coordinate'].get('y')
             if x is not None and y is not None:
                 chosen_nodes.append((x, y))
+                all_coords.append((x, y))
                 
         elif event_type == 'exploring_node' and 'coordinate' in event:
             x, y = event['coordinate'].get('x'), event['coordinate'].get('y')
             status = event.get('status')
             if x is not None and y is not None and status == 'accepted':
                 exploring_nodes.append((x, y))
+                all_coords.append((x, y))
                 
         elif event_type == 'processing_node' and 'coordinate' in event:
             x, y = event['coordinate'].get('x'), event['coordinate'].get('y')
             if x is not None and y is not None:
                 processing_nodes.append((x, y))
+                all_coords.append((x, y))
                 
         elif event_type == 'conflict_check' and 'anchor_coordinate' in event:
             x, y = event['anchor_coordinate'].get('x'), event['anchor_coordinate'].get('y')
             conflict = event.get('conflict_found')
             if x is not None and y is not None and conflict:
                 conflict_nodes.append((x, y))
+                all_coords.append((x, y))
                 
         elif event_type == 'pause_node' and 'coordinate' in event:
             x, y = event['coordinate'].get('x'), event['coordinate'].get('y')
             if x is not None and y is not None:
                 pause_nodes.append((x, y))
+                all_coords.append((x, y))
                 
         elif event_type == 'cannot_revisit_node' and 'coordinate' in event:
             x, y = event['coordinate'].get('x'), event['coordinate'].get('y')
@@ -60,23 +70,32 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
                 cannot_revisit_nodes.append((x, y))
     
     fig = go.Figure()
-    
-    grid_width = max_x - min_x + 1
-    grid_height = max_y - min_y + 1
-    
-    for x in range(int(min_x), int(max_x) + 1):
+
+
+    # Determine the visible area based on the nodes we need to display
+    # Add a small buffer around the area
+    buffer = 2
+    if all_coords:
+        visible_min_x = max(min_x, min(coord[0] for coord in all_coords) - buffer)
+        visible_max_x = min(max_x, max(coord[0] for coord in all_coords) + buffer)
+        visible_min_y = max(min_y, min(coord[1] for coord in all_coords) - buffer)
+        visible_max_y = min(max_y, max(coord[1] for coord in all_coords) + buffer)
+    else:
+        visible_min_x, visible_max_x = min_x, max_x
+        visible_min_y, visible_max_y = min_y, max_y  
+        
+    for x in range(int(visible_min_x), int(visible_max_x) + 1):                    
         fig.add_trace(go.Scatter(
             x=[x, x], 
-            y=[min_y, max_y],
+            y=[visible_min_y, visible_max_y],
             mode='lines',
             line=dict(color='lightgray', width=1),
             hoverinfo='none',
             showlegend=False
         ))
-    
-    for y in range(int(min_y), int(max_y) + 1):
+    for y in range(int(visible_min_y), int(visible_max_y) + 1):                    
         fig.add_trace(go.Scatter(
-            x=[min_x, max_x],
+            x=[visible_min_x, visible_max_x],
             y=[y, y],
             mode='lines',
             line=dict(color='lightgray', width=1),
@@ -215,16 +234,16 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
         xaxis=dict(
             title='X Coordinate',
             tickmode='linear',
-            tick0=min_x,
+            tick0=visible_min_x,
             dtick=1,
-            range=[min_x - 1, max_x + 1]
+            range=[visible_min_x - 1, visible_max_x + 1]                    
         ),
         yaxis=dict(
             title='Y Coordinate',
             tickmode='linear',
-            tick0=min_y,
+            tick0=visible_min_y,                    
             dtick=1,
-            range=[min_y - 1, max_y + 1],
+            range=[visible_min_y - 1, visible_max_y + 1],
             scaleanchor='x',
             scaleratio=1
         ),
@@ -283,7 +302,14 @@ def display_event_details(event):
         st.write(f"Physical Direction: {event.get('physical_direction')}")
         st.write(f"Rack Direction: {event.get('rack_direction')}")
         st.write(f"Status: {event.get('status')}")
-    
+
+
+        # Highlighting rejection reason if the node was rejected
+        if event.get('status') == 'rejected' and 'rejection_reason' in event:
+            st.markdown("<div style='background-color: #ffcccc; padding: 10px; border-radius: 5px; margin-top: 10px;'>"
+                      f"<strong>Rejection Reason:</strong> {event.get('rejection_reason')}"
+                      "</div>", unsafe_allow_html=True)
+            
     elif event_type == 'processing_node':
         if 'coordinate' in event:
             coord = event['coordinate']
