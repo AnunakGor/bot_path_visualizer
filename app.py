@@ -10,7 +10,8 @@ from log_parser import parse_log_to_json
 from visualization import (
     create_grid_visualization, 
     display_event_details,
-    display_metrics
+    display_metrics,
+    display_priority_queue
 )
 from utils import (
     get_log_files,
@@ -18,6 +19,8 @@ from utils import (
     get_min_max_coordinates,
     get_unique_bot_ids,
     get_events_by_bot_id,
+    get_path_calculation_events,
+    filter_events_by_path,
     save_uploaded_file
 )
 
@@ -244,6 +247,12 @@ if log_file_path:
             display_event_details(current_event)
         else:
             st.warning("No event data available for the current step.")
+            
+    # Priority Queue Visualization
+    st.markdown("---")
+    st.subheader("Priority Queue Visualization")
+    st.markdown("This section shows the nodes currently in the priority queue during the A* path finding algorithm.")
+    display_priority_queue(filtered_events, st.session_state.current_step)
     
     # Metrics and statistics
     st.markdown("---")
