@@ -346,6 +346,19 @@ def display_event_details(event):
         if 'coordinate' in event:
             coord = event['coordinate']
             st.write(f"Coordinate: ({coord.get('x')}, {coord.get('y')})")
+          
+        if 'from_coordinate' in event:
+            from_coord = event['from_coordinate']
+            st.write(f"From Coordinate: ({from_coord.get('x')}, {from_coord.get('y')})")
+        
+        if 'bot_direction' in event:
+            st.write(f"Bot Direction: {event.get('bot_direction')}")
+            
+        if 'physical_direction' in event:
+            st.write(f"Physical Direction: {event.get('physical_direction')}")
+            
+        if 'rack_direction' in event:
+            st.write(f"Rack Direction: {event.get('rack_direction')}")
         
         if 'GCost' in event and 'HCost' in event and 'FScore' in event:
             st.write(f"G Cost: {event.get('GCost')}")
