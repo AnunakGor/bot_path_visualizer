@@ -184,7 +184,7 @@ class PathLogParser:
         timestamp = self._extract_timestamp(line)
         bot_id = self._extract_bot_id(line)
         
-        # Format: #chosen_node = {{442,20}, {444,20}, rest, butler_moving, south, south}
+        # Format: #chosen_node = {{442,20}, {444,20}, rest, butler_moving, east, east, south, no_turn_rotate}
         # Extracting coordinate information
         coord_match = re.search(r'\{\{(\d+),(\d+)\}, \{(\d+),(\d+)\}', line)
         if coord_match:
@@ -199,6 +199,18 @@ class PathLogParser:
             gcost = int(gcost_match.group(1)) if gcost_match else None
             hcost = int(hcost_match.group(1)) if hcost_match else None
             fscore = int(fscore_match.group(1)) if fscore_match else None
+
+            directions_match = re.search(r'\}, ([^,]+), ([^,]+), ([^,]+), ([^,]+), ([^,]+)', line)
+            
+            bot_direction = None
+            physical_direction = None
+            rack_direction = None
+            
+            if directions_match:
+                # In the format, the 3rd, 4th, and 5th groups are the directions
+                bot_direction = directions_match.group(3)
+                physical_direction = directions_match.group(4)
+                rack_direction = directions_match.group(5)
             
             event = {
                 "event_id": self.event_id,
@@ -209,7 +221,10 @@ class PathLogParser:
                 "from_coordinate": {"x": from_x, "y": from_y},
                 "GCost": gcost,
                 "HCost": hcost,
-                "FScore": fscore
+                "FScore": fscore,
+                "bot_direction": bot_direction,
+                "physical_direction": physical_direction,
+                "rack_direction": rack_direction
             }
             
             self.events.append(event)
