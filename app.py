@@ -69,9 +69,11 @@ if 'parsed_events' not in st.session_state:
     st.session_state.parsed_events = []
 if 'bot_id_filter' not in st.session_state:
     st.session_state.bot_id_filter = None
+if 'path_filter' not in st.session_state:
+    st.session_state.path_filter = None
 if 'speed' not in st.session_state:
-    st.session_state.speed = 1.0 
-
+    st.session_state.speed = 1.0                     
+  
 log_file_path = None
 
 if uploaded_file:
@@ -112,6 +114,37 @@ if log_file_path:
         st.session_state.bot_id_filter = selected_bot
     else:
         st.session_state.bot_id_filter = None
+        
+    # Path selection dropdown
+    path_events = get_path_calculation_events(filtered_events)  
+    
+    if path_events:
+        path_options = ["All Paths"] + [path['label'] for path in path_events]      
+        selected_path = st.sidebar.selectbox(
+            "Select Path to Visualize:",
+            path_options,
+            index=0
+        )
+        # Filtering events by selected path
+        if selected_path != "All Paths":
+            # Find the selected path event
+            selected_path_event = next((p for p in path_events if p['label'] == selected_path), None)           
+
+            if selected_path_event:
+                # Filter events to show only those between start and end of the selected path
+                filtered_events = filter_events_by_path(
+                    filtered_events, 
+                    selected_path_event['start_idx'], 
+                    selected_path_event['end_idx']
+                )
+                st.session_state.path_filter = selected_path
+                
+                # Reset current step when path changes
+                if st.session_state.get('last_path') != selected_path:
+                    st.session_state.current_step = 0
+                    st.session_state.last_path = selected_path
+        else:
+            st.session_state.path_filter = None
     
     # Animation controls in sidebar
     st.sidebar.markdown("---")
@@ -133,6 +166,20 @@ if log_file_path:
     if step_slider != st.session_state.current_step:
         st.session_state.current_step = step_slider
         st.session_state.play_animation = False  # Stop animation when manually changing step
+
+    # Jump to event ID
+    st.sidebar.markdown("---")
+    jump_col1, jump_col2 = st.sidebar.columns([3, 1])
+    with jump_col1:
+        event_id_input = st.number_input("Jump to Event ID", min_value=1, max_value=max(max_step+1, 1), step=1, value=1)
+    with jump_col2:
+        if st.button("Jump"):
+            # Find the index of the event with the specified event_id
+            for i, event in enumerate(filtered_events):
+                if event.get('event_id') == event_id_input:
+                    st.session_state.current_step = i
+                    st.session_state.play_animation = False  # Stop animation when jumping
+                    break
     
     # Play/Pause button
     play_text = "⏸️ Pause" if st.session_state.play_animation else "▶️ Play"
@@ -165,10 +212,15 @@ if log_file_path:
         step=0.1
     )
     
-    # Display filter information
+    # Displaying filter information
+    filter_info = []
     if st.session_state.bot_id_filter:
-        st.info(f"Filtered to show only Bot ID: {st.session_state.bot_id_filter}")
-    
+        filter_info.append(f"Bot ID: {st.session_state.bot_id_filter}")
+    if st.session_state.path_filter:
+        filter_info.append(f"Path: {st.session_state.path_filter}")
+    if filter_info:
+        st.info(f"Filtered to show: {' | '.join(filter_info)}")                    
+  
     # grid boundaries
     min_x, min_y, max_x, max_y = get_min_max_coordinates(filtered_events)
     
