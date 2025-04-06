@@ -83,6 +83,45 @@ def get_events_by_bot_id(events, bot_id):
     """Filter events by bot ID."""
     return [event for event in events if event.get('bot_id') == bot_id]
 
+def get_path_calculation_events(events):
+    """Get all path calculation start events with their source and destination."""
+    path_events = []
+    for i, event in enumerate(events):
+        if event.get('event') == 'path_calculation_started':
+            # Find the corresponding end event if it exists
+            end_idx = None
+            for j in range(i+1, len(events)):
+                if events[j].get('event') == 'path_calculation_ended' and events[j].get('bot_id') == event.get('bot_id'):
+                    end_idx = j
+                    break
+            
+            # Create a descriptive label for the dropdown
+            src_coord = event.get('src', {}).get('coordinate', {})
+            dest_coord = event.get('dest', {}).get('coordinate', {})
+            src_str = f"({src_coord.get('x')},{src_coord.get('y')})" if src_coord else "(?,?)"
+            dest_str = f"({dest_coord.get('x')},{dest_coord.get('y')})" if dest_coord else "(?,?)"
+            
+            path_events.append({
+                'event_id': event.get('event_id'),
+                'bot_id': event.get('bot_id'),
+                'start_idx': i,
+                'end_idx': end_idx,
+                'src': src_str,
+                'dest': dest_str,
+                'label': f"Path {event.get('event_id')}: {src_str} → {dest_str}"
+            })
+    
+    return path_events
+
+def filter_events_by_path(events, start_idx, end_idx):
+    """Filter events to show only those between start_idx and end_idx."""
+    if end_idx is None:
+        # If no end event found, include all events after start_idx
+        return events[start_idx:]
+    else:
+        # Include events between start and end (inclusive)
+        return events[start_idx:end_idx+1]
+
 def calculate_path_metrics(events):
     """Calculate metrics about the path planning process."""
     if not events:
