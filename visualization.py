@@ -1,9 +1,70 @@
-import streamlit as st
+import streamlit as st                    
+  
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import math
+
+from collections import defaultdict
+
+def track_priority_queue(events, current_step_idx):
+    """Track the state of the priority queue up to the current step.
+    The priority queue is updated based on added_node and chosen_node events:
+    - added_node: A node is added to the priority queue
+    - chosen_node: A node is removed from the priority queue (popped)
+    Returns a list of nodes currently in the priority queue, sorted by F-score.
+    """
+    
+    priority_queue = []                    
+
+    for i, event in enumerate(events[:current_step_idx+1]):
+        event_type = event.get('event')
+        if event_type == 'added_node':
+            # Adding node to priority queue
+            if all(k in event for k in ['coordinate', 'GCost', 'HCost', 'FScore']):
+                node = {
+                    'coordinate': event['coordinate'],
+                    'from_coordinate': event.get('from_coordinate'),
+                    'GCost': event['GCost'],
+                    'HCost': event['HCost'], 
+                    'FScore': event['FScore'],
+                    'bot_direction': event.get('bot_direction'),
+                    'physical_direction': event.get('physical_direction'),
+                    'rack_direction': event.get('rack_direction'),
+                    'turn_tag': event.get('turn_tag'),
+                    'moving_status': event.get('moving_status'),
+                    'pause_time': event.get('pause_time', 0)
+                }
+                # Checking if this node is already in the queue
+                existing_idx = None
+                for idx, q_node in enumerate(priority_queue):
+                    if (q_node['coordinate'].get('x') == node['coordinate'].get('x') and 
+                        q_node['coordinate'].get('y') == node['coordinate'].get('y')):
+                        existing_idx = idx
+                        break
+                if existing_idx is not None:
+                    # Update existing node if it has a better score
+                    if node['FScore'] < priority_queue[existing_idx]['FScore']:
+                        priority_queue[existing_idx] = node
+                else:
+                    # Add new node
+                    priority_queue.append(node)
+                    
+        elif event_type == 'chosen_node':
+            # Remove node from priority queue
+            if 'coordinate' in event:
+                x, y = event['coordinate'].get('x'), event['coordinate'].get('y')
+                # Find and remove the node with matching coordinates
+                for idx, node in enumerate(priority_queue):
+                    if (node['coordinate'].get('x') == x and 
+                        node['coordinate'].get('y') == y):
+                        priority_queue.pop(idx)
+                        break            
+
+    # Ascending sort by FScore
+    priority_queue.sort(key=lambda x: (x['FScore'], x['HCost']))
+    return priority_queue
 
 def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max_y):
     current_events = events[:current_step_idx+1] if current_step_idx < len(events) else events
@@ -68,6 +129,7 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             x, y = event['coordinate'].get('x'), event['coordinate'].get('y')
             if x is not None and y is not None:
                 cannot_revisit_nodes.append((x, y))
+                all_coords.append((x, y))
     
     fig = go.Figure()
 
@@ -397,6 +459,126 @@ def display_event_details(event):
         st.write(f"Bot Direction: {event.get('bot_direction')}")
         st.write(f"Rack Direction: {event.get('rack_direction')}")
         st.write(f"Reason: {event.get('reason')}")
+
+def display_priority_queue(events, current_step_idx):
+    """Display the current state of the priority queue."""
+    priority_queue = track_priority_queue(events, current_step_idx)
+    if not priority_queue:
+        st.info("Priority queue is empty.")
+        return
+    st.subheader(f"Priority Queue ({len(priority_queue)} nodes)")
+    st.caption("Nodes are sorted by F-Score (lowest first) as in the A* algorithm")
+    # Creating a DataFrame                    
+    queue_data = []
+    for node in priority_queue:
+        coord = node['coordinate']
+        from_coord = node.get('from_coordinate', {})
+        queue_data.append({
+            'Coordinate': f"({coord.get('x')}, {coord.get('y')})",
+            'From': f"({from_coord.get('x')}, {from_coord.get('y')})" if from_coord else "-",
+            'G Cost': node.get('GCost'),
+            'H Cost': node.get('HCost'),
+            'F Score': node.get('FScore'),
+            'Direction': node.get('bot_direction'),
+            'Turn Tag': node.get('turn_tag'),
+            'Moving Status': node.get('moving_status'),
+            'Pause Time': node.get('pause_time', 0)
+        })
+        
+    # Tabular display
+    st.dataframe(queue_data, use_container_width=True)
+    
+    # Visualize the priority queue nodes on a small grid
+    if priority_queue:
+        st.caption("Priority Queue Nodes Visualization")
+        
+        coords = [(node['coordinate'].get('x'), node['coordinate'].get('y')) 
+                 for node in priority_queue if 'coordinate' in node]
+        if coords:
+            
+            # Determine grid boundaries
+            min_x = min(coord[0] for coord in coords) - 1
+            max_x = max(coord[0] for coord in coords) + 1
+            min_y = min(coord[1] for coord in coords) - 1
+            max_y = max(coord[1] for coord in coords) + 1
+            
+            # simple grid visualization
+            fig = go.Figure()
+            # Add grid lines
+            for x in range(int(min_x), int(max_x) + 1):
+                fig.add_trace(go.Scatter(
+                    x=[x, x],
+                    y=[min_y, max_y],
+                    mode='lines',
+                    line=dict(color='lightgray', width=1),
+                    hoverinfo='none',
+                    showlegend=False
+                ))
+            for y in range(int(min_y), int(max_y) + 1):
+                fig.add_trace(go.Scatter(
+                    x=[min_x, max_x],
+                    y=[y, y],
+                    mode='lines',
+                    line=dict(color='lightgray', width=1),
+                    hoverinfo='none',
+                    showlegend=False
+                ))
+            
+            # Add nodes with their F-scores 
+            x_vals = []
+            y_vals = []
+            text_vals = []
+            hover_texts = []
+            for node in priority_queue:
+                x = node['coordinate'].get('x')
+                y = node['coordinate'].get('y')
+                f_score = node.get('FScore')
+                g_cost = node.get('GCost')
+                h_cost = node.get('HCost')
+
+                x_vals.append(x)
+                y_vals.append(y)
+                text_vals.append(str(f_score))
+                hover_texts.append(f"Coord: ({x}, {y})<br>F: {f_score}<br>G: {g_cost}<br>H: {h_cost}")
+                
+            # Add nodes
+            fig.add_trace(go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='markers+text',
+                marker=dict(color='orange', size=15, symbol='square'),
+                text=text_vals,
+                textposition='middle center',
+                hovertext=hover_texts,
+                hoverinfo='text',
+                name='Queue Nodes'
+            ))
+
+            
+
+            fig.update_layout(
+                title='Priority Queue Nodes',
+                xaxis=dict(
+                    title='X Coordinate',
+                    tickmode='linear',
+                    tick0=min_x,
+                    dtick=1,
+                    range=[min_x - 0.5, max_x + 0.5]
+                ),
+                yaxis=dict(
+                    title='Y Coordinate',
+                    tickmode='linear',
+                    tick0=min_y,
+                    dtick=1,
+                    range=[min_y - 0.5, max_y + 0.5],
+                    scaleanchor='x',
+                    scaleratio=1
+                ),
+                height=400,
+                hovermode='closest',
+                margin=dict(l=0, r=0, t=30, b=0)
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 def display_metrics(events):
     metrics = calculate_path_metrics(events)
