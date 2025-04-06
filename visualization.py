@@ -332,6 +332,24 @@ def display_event_details(event):
             if len(spans) > 5:
                 span_display.append('...')
             st.write(f"Span Coordinates: {span_display}")
+
+        # Highlighting conflict reason if conflict was found
+        if event.get('conflict_found') and 'conflict_reason' in event:
+            st.markdown("<div style='background-color: #ffcccc; padding: 10px; border-radius: 5px; margin-top: 10px;'>"
+                      f"<strong>Conflict Reason:</strong> {event.get('conflict_reason')}"
+                      "</div>", unsafe_allow_html=True)
+
+    elif event_type == 'conflict_detected':
+        if 'coordinate' in event:
+            coord = event['coordinate']
+            st.write(f"Coordinate: ({coord.get('x')}, {coord.get('y')})")
+        st.write(f"Conflict Found: {event.get('conflict_found')}")
+        
+        # Highlighting conflict reason
+        if 'conflict_reason' in event:
+            st.markdown("<div style='background-color: #ffcccc; padding: 10px; border-radius: 5px; margin-top: 10px;'>"
+                      f"<strong>Conflict Reason:</strong> {event.get('conflict_reason')}"
+                      "</div>", unsafe_allow_html=True)
     
     elif event_type == 'added_node':
         if 'coordinate' in event:
