@@ -366,7 +366,18 @@ def display_event_details(event):
             st.write(f"F Score: {event.get('FScore')}")
     
     elif event_type == 'neighbour_nodes':
-        st.write(f"Neighbors: {event.get('neighbors_raw')}")
+        st.write(f"Neighbours Raw: {event.get('neighbors_raw')}")
+        
+        if 'parsed_neighbors' in event and event['parsed_neighbors']:
+            st.subheader("Parsed Neighbours:")
+            for i, neighbor in enumerate(event['parsed_neighbors']):
+                with st.expander(f"Neighbour {i+1}"):
+                    if 'coordinate' in neighbor:
+                        st.write(f"Coordinate: ({neighbor['coordinate'].get('x')}, {neighbor['coordinate'].get('y')})")
+                    st.write(f"Bot Direction: {neighbor.get('bot_direction')}")
+                    st.write(f"Rack Direction: {neighbor.get('rack_direction')}")
+                    st.write(f"Turn Tag: {neighbor.get('turn_tag')}")
+                    st.write(f"Moving Status: {neighbor.get('moving_status')}")
     
     elif event_type == 'exploring_node':
         if 'coordinate' in event:
