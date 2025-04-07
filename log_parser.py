@@ -239,13 +239,62 @@ class PathLogParser:
         neighbors_match = re.search(r'#neighbour_nodes = \[(.*?)\]', line)
         if neighbors_match:
             neighbors_raw = neighbors_match.group(1)
+
+            
+            # Parsing individual neighbor nodes
+            parsed_neighbors = []
+            neighbor_entries = re.findall(r'\{\{(\d+),(\d+)\},(\w+),(\w+),(\w+),(\w+)?\}', neighbors_raw)
+            
+            for entry in neighbor_entries:
+                if len(entry) >= 5:
+                    x, y, bot_direction, rack_direction, turn_tag = entry[:5]
+                    moving_status = entry[5] if len(entry) > 5 else None
+                    
+                    neighbor = {
+                        "coordinate": {"x": int(x), "y": int(y)},
+                        "bot_direction": bot_direction,
+                        "rack_direction": rack_direction,
+                        "turn_tag": turn_tag,
+                        "moving_status": moving_status
+                    }
+                    parsed_neighbors.append(neighbor)
+            
+            if not parsed_neighbors:
+                # Split by '},{'  which separates neighbor entries
+                entries = neighbors_raw.split('},{')
+                for entry in entries:
+                    entry = entry.strip('{},')
+                    parts = entry.split(',')
+                    
+                    if len(parts) >= 4:
+                        # Extract coordinate
+                        coord_match = re.search(r'\{(\d+),(\d+)\}', parts[0] + ',' + parts[1])
+                        if coord_match:
+                            x, y = int(coord_match.group(1)), int(coord_match.group(2))
+                            # Determine indices for direction based on the match
+                            direction_start_idx = 2
+                            
+                            bot_direction = parts[direction_start_idx] if direction_start_idx < len(parts) else None
+                            rack_direction = parts[direction_start_idx + 1] if direction_start_idx + 1 < len(parts) else None
+                            turn_tag = parts[direction_start_idx + 2] if direction_start_idx + 2 < len(parts) else None
+                            moving_status = parts[direction_start_idx + 3] if direction_start_idx + 3 < len(parts) else None
+                            
+                            neighbor = {
+                                "coordinate": {"x": x, "y": y},
+                                "bot_direction": bot_direction,
+                                "rack_direction": rack_direction,
+                                "turn_tag": turn_tag,
+                                "moving_status": moving_status
+                            }
+                            parsed_neighbors.append(neighbor)
             
             event = {
                 "event_id": self.event_id,
                 "event": "neighbour_nodes",
                 "timestamp": timestamp,
                 "bot_id": bot_id,
-                "neighbors_raw": neighbors_raw
+                "neighbors_raw": neighbors_raw,
+                "parsed_neighbors": parsed_neighbors
             }
             
             self.events.append(event)
