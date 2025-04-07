@@ -219,6 +219,17 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             marker=dict(color='magenta', size=12, symbol='square'),
             name='Cannot Revisit Nodes'
         ))
+      
+    if neighbour_nodes:
+        x_vals = [coord[0] for coord in neighbour_nodes]
+        y_vals = [coord[1] for coord in neighbour_nodes]
+        fig.add_trace(go.Scatter(
+            x=x_vals,
+            y=y_vals,
+            mode='markers',
+            marker=dict(color='blue', size=12, symbol='diamond-open'),
+            name='Neighbouring Nodes'
+        ))
     
     if chosen_nodes:
         x_vals = [coord[0] for coord in chosen_nodes]
