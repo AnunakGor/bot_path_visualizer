@@ -75,6 +75,7 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
     conflict_nodes = []
     pause_nodes = []
     cannot_revisit_nodes = []
+    neighbour_nodes = []
     
     src_coord = None
     dest_coord = None
