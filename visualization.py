@@ -130,6 +130,15 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             if x is not None and y is not None:
                 cannot_revisit_nodes.append((x, y))
                 all_coords.append((x, y))
+              
+          # Extracting neighbouring nodes if the current event is neighbour_nodes
+        if event_type == 'neighbour_nodes' and event == events[current_step_idx] and 'parsed_neighbors' in event:
+            for neighbor in event['parsed_neighbors']:
+                if 'coordinate' in neighbor:
+                    x, y = neighbor['coordinate'].get('x'), neighbor['coordinate'].get('y')
+                    if x is not None and y is not None:
+                        neighbour_nodes.append((x, y))
+                        all_coords.append((x, y))
     
     fig = go.Figure()
 
