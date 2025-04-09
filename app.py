@@ -75,7 +75,58 @@ if 'bot_id_filter' not in st.session_state:
 if 'path_filter' not in st.session_state:
     st.session_state.path_filter = None
 if 'speed' not in st.session_state:
-    st.session_state.speed = 1.0                     
+    st.session_state.speed = 1.0  
+if 'event_type_filters' not in st.session_state:
+    st.session_state.event_type_filters = {
+        'chosen_node': True,
+        'exploring_node': True,
+        'processing_node': True,
+        'conflict_check': True,
+        'conflict_detected': True,
+        'pause_node': True,
+        'cannot_revisit_node': True,
+        'neighbour_nodes': True
+
+    }
+if 'filter_navigation' not in st.session_state:
+    st.session_state.filter_navigation = False
+
+# function to find the next/previous event that matches the selected event types
+def find_filtered_event_index(events, current_index, direction, event_type_filters):
+    """Find the next/previous event index that matches the selected event types.
+    
+    Args:
+        events: List of events
+        current_index: Current event index
+        direction: 'next' or 'previous'
+        event_type_filters: Dictionary of event types to filter by
+    
+    Returns:
+        Index of the next/previous event that matches the filter, or current_index if none found
+    """
+    # If no filters are active or filter navigation is disabled, just return next/previous index
+    if not st.session_state.filter_navigation or all(event_type_filters.values()):
+        if direction == 'next':
+            return min(len(events) - 1, current_index + 1)
+        else:  # previous
+            return max(0, current_index - 1)
+    
+    # list of event types that are enabled in the filter
+    enabled_event_types = [event_type for event_type, enabled in event_type_filters.items() if enabled]
+    
+    # Search for the next/previous event that matches the filter
+    if direction == 'next':
+        for i in range(current_index + 1, len(events)):
+            event_type = events[i].get('event')
+            if event_type in enabled_event_types:
+                return i
+        return current_index  # No matching event found
+    else:  # previous
+        for i in range(current_index - 1, -1, -1):
+            event_type = events[i].get('event')
+            if event_type in enabled_event_types:
+                return i
+        return current_index  # No matching event found
   
 log_file_path = None
 
@@ -188,6 +239,13 @@ if log_file_path:
     play_text = "⏸️ Pause" if st.session_state.play_animation else "▶️ Play"
     if st.sidebar.button(play_text):
         st.session_state.play_animation = not st.session_state.play_animation
+
+    # Filter navigation checkbox
+    st.session_state.filter_navigation = st.sidebar.checkbox(
+        "Filter navigation by event types",
+        value=st.session_state.filter_navigation,
+        help="When enabled, Next/Previous buttons will skip to events of selected types only"
+    )
     
     # Step buttons
     col1, col2, col3 = st.sidebar.columns(3)
@@ -198,12 +256,22 @@ if log_file_path:
     
     with col2:
         if st.button("⏪ Previous"):
-            st.session_state.current_step = max(0, st.session_state.current_step - 1)
+            st.session_state.current_step = find_filtered_event_index(
+                filtered_events, 
+                st.session_state.current_step, 
+                'previous', 
+                st.session_state.event_type_filters
+            )
             st.session_state.play_animation = False
     
     with col3:
         if st.button("⏩ Next"):
-            st.session_state.current_step = min(max_step, st.session_state.current_step + 1)
+            st.session_state.current_step = find_filtered_event_index(
+                filtered_events, 
+                st.session_state.current_step, 
+                'next', 
+                st.session_state.event_type_filters
+            )
             st.session_state.play_animation = False
     
     # Speed control
@@ -214,13 +282,72 @@ if log_file_path:
         value=st.session_state.speed,
         step=0.1
     )
+
+    # Event type filters
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Event Type Filters")
+    st.sidebar.markdown("Select which event types to include in navigation (Next/Previous buttons and animation):")
     
+    # 2-column layout for the checkboxes 
+    filter_col1, filter_col2 = st.sidebar.columns(2)
+    
+    with filter_col1:
+        st.session_state.event_type_filters['chosen_node'] = st.checkbox(
+            "chosen_node", 
+            value=st.session_state.event_type_filters['chosen_node'],
+            key="filter_chosen_node"
+        )
+        st.session_state.event_type_filters['exploring_node'] = st.checkbox(
+            "exploring_node", 
+            value=st.session_state.event_type_filters['exploring_node'],
+            key="filter_exploring_node"
+        )
+        st.session_state.event_type_filters['processing_node'] = st.checkbox(
+            "processing_node", 
+            value=st.session_state.event_type_filters['processing_node'],
+            key="filter_processing_node"
+        )
+        st.session_state.event_type_filters['conflict_check'] = st.checkbox(
+            "conflict_check", 
+            value=st.session_state.event_type_filters['conflict_check'],
+            key="filter_conflict_check"
+        )
+    
+    with filter_col2:
+        st.session_state.event_type_filters['conflict_detected'] = st.checkbox(
+            "conflict_detected", 
+            value=st.session_state.event_type_filters['conflict_detected'],
+            key="filter_conflict_detected"
+        )
+
+        st.session_state.event_type_filters['pause_node'] = st.checkbox(
+            "pause_node", 
+            value=st.session_state.event_type_filters['pause_node'],
+            key="filter_pause_node"
+        )
+        st.session_state.event_type_filters['cannot_revisit_node'] = st.checkbox(
+            "cannot_revisit_node", 
+            value=st.session_state.event_type_filters['cannot_revisit_node'],
+            key="filter_cannot_revisit_node"
+        )
+        st.session_state.event_type_filters['neighbour_nodes'] = st.checkbox(
+            "neighbour_nodes", 
+            value=st.session_state.event_type_filters['neighbour_nodes'],
+            key="filter_neighbour_nodes"
+        )
+        
     # Displaying filter information
     filter_info = []
     if st.session_state.bot_id_filter:
         filter_info.append(f"Bot ID: {st.session_state.bot_id_filter}")
     if st.session_state.path_filter:
         filter_info.append(f"Path: {st.session_state.path_filter}")
+
+    # Adding event type filters to the filter info
+    event_filters = [k for k, v in st.session_state.event_type_filters.items() if not v]
+    if event_filters:
+        filter_info.append(f"Navigation skips: {', '.join(event_filters)}")
+        
     if filter_info:
         st.info(f"Filtered to show: {' | '.join(filter_info)}")                    
   
@@ -232,10 +359,23 @@ if log_file_path:
     
     with col1:
         if filtered_events:
+            # Pass all event types as visible for visualization regardless of filter settings
+            # This ensures the plot is not affected by the filter settings
+            visualization_filters = {
+                'chosen_node': True,
+                'exploring_node': True,
+                'processing_node': True,
+                'conflict_check': True,
+                'conflict_detected': True,
+                'pause_node': True,
+                'cannot_revisit_node': True,
+                'neighbour_nodes': True,
+            }
             grid_fig = create_grid_visualization(
                 filtered_events, 
                 st.session_state.current_step,
-                min_x, min_y, max_x, max_y
+                min_x, min_y, max_x, max_y,
+                event_type_filters=visualization_filters
             )
             st.plotly_chart(grid_fig, use_container_width=True)
         else:
@@ -244,6 +384,11 @@ if log_file_path:
     with col2:
         if 0 <= st.session_state.current_step < len(filtered_events):
             current_event = filtered_events[st.session_state.current_step]
+            event_type = current_event.get('event')
+            
+            # Checking if the current event type is filtered out
+            if event_type in st.session_state.event_type_filters and not st.session_state.event_type_filters[event_type]:
+                st.warning(f"Current event type '{event_type}' is filtered out in visualization. Enable it in the filters to see details.")
             display_event_details(current_event)
         else:
             st.warning("No event data available for the current step.")
@@ -323,7 +468,21 @@ if log_file_path:
     # Auto-advance animation if playing
     if st.session_state.play_animation and st.session_state.current_step < max_step:
         time.sleep(0.2 / st.session_state.speed)  # Adjust speed based on slider
-        st.session_state.current_step += 1
+        # st.session_state.current_step += 1
+        
+        # Using filtered navigation 
+        next_step = find_filtered_event_index(
+            filtered_events, 
+            st.session_state.current_step, 
+            'next', 
+            st.session_state.event_type_filters
+        )
+        
+        # If we couldn't advance (at the end or no matching events), stop animation
+        if next_step == st.session_state.current_step:
+            st.session_state.play_animation = False
+        else:
+            st.session_state.current_step = next_step
         st.rerun()
 
 else:
