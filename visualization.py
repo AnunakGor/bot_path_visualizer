@@ -66,8 +66,21 @@ def track_priority_queue(events, current_step_idx):
     priority_queue.sort(key=lambda x: (x['FScore'], x['HCost']))
     return priority_queue
 
-def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max_y):
-    current_events = events[:current_step_idx+1] if current_step_idx < len(events) else events
+def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max_y, event_type_filters=None):
+    current_events = events[:current_step_idx+1] if current_step_idx < len(events) else events                    
+  
+    if event_type_filters is None:
+        event_type_filters = {
+            'chosen_node': True,
+            'exploring_node': True,
+            'processing_node': True,
+            'conflict_check': True,
+            'conflict_detected': True,
+            'pause_node': True,
+            'cannot_revisit_node': True,
+            'neighbour_nodes': True,
+            # 'source_dest': True
+        }
     
     chosen_nodes = []
     exploring_nodes = []
@@ -175,7 +188,7 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             showlegend=False
         ))
     
-    if exploring_nodes:
+    if exploring_nodes and event_type_filters.get('exploring_node', True):
         x_vals = [coord[0] for coord in exploring_nodes]
         y_vals = [coord[1] for coord in exploring_nodes]
         fig.add_trace(go.Scatter(
@@ -185,8 +198,8 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             marker=dict(color='lightblue', size=12, symbol='square'),
             name='Explored Nodes'
         ))
-    
-    if processing_nodes:
+
+    if processing_nodes and event_type_filters.get('processing_node', True):
         x_vals = [coord[0] for coord in processing_nodes]
         y_vals = [coord[1] for coord in processing_nodes]
         fig.add_trace(go.Scatter(
@@ -197,7 +210,7 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             name='Processing Nodes'
         ))
     
-    if conflict_nodes:
+    if conflict_nodes and event_type_filters.get('conflict_check', True):
         x_vals = [coord[0] for coord in conflict_nodes]
         y_vals = [coord[1] for coord in conflict_nodes]
         fig.add_trace(go.Scatter(
@@ -208,7 +221,7 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             name='Conflict Nodes'
         ))
         
-    if pause_nodes:
+    if pause_nodes and event_type_filters.get('pause_node', True):
         x_vals = [coord[0] for coord in pause_nodes]
         y_vals = [coord[1] for coord in pause_nodes]
         fig.add_trace(go.Scatter(
@@ -219,7 +232,7 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             name='Pause Nodes'
         ))
         
-    if cannot_revisit_nodes:
+    if cannot_revisit_nodes and event_type_filters.get('cannot_revisit_node', True):
         x_vals = [coord[0] for coord in cannot_revisit_nodes]
         y_vals = [coord[1] for coord in cannot_revisit_nodes]
         fig.add_trace(go.Scatter(
@@ -230,7 +243,7 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             name='Cannot Revisit Nodes'
         ))
       
-    if neighbour_nodes:
+    if neighbour_nodes and event_type_filters.get('neighbour_nodes', True):
         x_vals = [coord[0] for coord in neighbour_nodes]
         y_vals = [coord[1] for coord in neighbour_nodes]
         fig.add_trace(go.Scatter(
@@ -241,7 +254,7 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             name='Neighbouring Nodes'
         ))
     
-    if chosen_nodes:
+    if chosen_nodes and event_type_filters.get('chosen_node', True):
         x_vals = [coord[0] for coord in chosen_nodes]
         y_vals = [coord[1] for coord in chosen_nodes]
         fig.add_trace(go.Scatter(
@@ -270,6 +283,25 @@ def create_grid_visualization(events, current_step_idx, min_x, min_y, max_x, max
             marker=dict(color='purple', size=20, symbol='circle'),
             name='Destination'
         ))
+
+    # if event_type_filters.get('source_dest', True):
+    #     if src_coord:
+    #         fig.add_trace(go.Scatter(
+    #             x=[src_coord[0]],
+    #             y=[src_coord[1]],
+    #             mode='markers',
+    #             marker=dict(color='blue', size=20, symbol='circle'),
+    #             name='Source'
+    #         ))
+        
+    #     if dest_coord:
+    #         fig.add_trace(go.Scatter(
+    #             x=[dest_coord[0]],
+    #             y=[dest_coord[1]],
+    #             mode='markers',
+    #             marker=dict(color='purple', size=20, symbol='circle'),
+    #             name='Destination'
+    #         ))
     
     current_event = events[current_step_idx] if current_step_idx < len(events) else None
     if current_event:
